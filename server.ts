@@ -1,6 +1,8 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
@@ -8,7 +10,41 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// File-backed persistence for plans (mimicking SQLite database table)
+const DATA_DIR = path.resolve('data');
+const PLANS_FILE = path.join(DATA_DIR, 'plans.json');
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function getStoredPlans(): any[] {
+  try {
+    ensureDataDir();
+    if (!fs.existsSync(PLANS_FILE)) {
+      return [];
+    }
+    const data = fs.readFileSync(PLANS_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Error reading stored plans:', err);
+    return [];
+  }
+}
+
+function saveStoredPlans(plans: any[]) {
+  try {
+    ensureDataDir();
+    fs.writeFileSync(PLANS_FILE, JSON.stringify(plans, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving stored plans:', err);
+  }
+}
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -204,6 +240,53 @@ app.get('/api/status', (req, res) => {
     app: 'FitBuddy',
     geminiConfigured: !!process.env.GEMINI_API_KEY
   });
+});
+
+// GET /api/plans - Fetch all saved plans
+app.get('/api/plans', (req, res) => {
+  try {
+    const plans = getStoredPlans();
+    return res.json(plans);
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to retrieve plans.' });
+  }
+});
+
+// POST /api/plans - Save or update a plan
+app.post('/api/plans', (req, res) => {
+  try {
+    const newPlan = req.body;
+    if (!newPlan || !newPlan.id) {
+      return res.status(400).json({ error: 'Invalid plan record.' });
+    }
+    const plans = getStoredPlans();
+    const existingIndex = plans.findIndex(p => p.id === newPlan.id);
+    if (existingIndex >= 0) {
+      plans[existingIndex] = newPlan;
+    } else {
+      plans.unshift(newPlan);
+    }
+    saveStoredPlans(plans);
+    return res.json({ success: true, plan: newPlan });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to save plan.' });
+  }
+});
+
+// DELETE /api/plans/:id - Delete a specific plan by ID
+app.delete('/api/plans/:id', (req, res) => {
+  try {
+    const idToDelete = Number(req.params.id);
+    if (isNaN(idToDelete)) {
+      return res.status(400).json({ error: 'Invalid plan ID.' });
+    }
+    const plans = getStoredPlans();
+    const updated = plans.filter(p => Number(p.id) !== idToDelete);
+    saveStoredPlans(updated);
+    return res.json({ success: true, deletedId: idToDelete, remainingCount: updated.length });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to delete plan.' });
+  }
 });
 
 // Vite integration

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FitBuddy – AI Fitness Plan Generator</title>
-    <meta name="description" content="FitBuddy is an AI-powered fitness companion using Gemini to create tailored 7-day workout plans.">
+    <meta name="description" content="Your AI-Powered Fitness Companion. Generate personalized 7-day workout plans, nutrition guidance, and recovery tips using Gemini.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
                 <span class="brand-icon">⚡</span>
                 <span class="brand-text">FITBUDDY</span>
             </a>
-            <div class="nav-tagline">Your AI-Powered Fitness Companion</div>
+            <div class="nav-tagline">AI Fitness Companion</div>
             <div class="nav-links">
                 <a href="/" class="nav-link active">Home</a>
                 <a href="#planner-section" class="nav-link">Create Plan</a>
@@ -28,61 +28,124 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
+    <!-- Large Hero Section -->
     <header class="hero-section">
         <div class="hero-container">
-            <div class="hero-badge">
-                <span class="pulse-dot"></span> Powered by Google Gemini AI
-            </div>
-            <h1 class="hero-title">
-                Smart, Personalized Fitness Plans <br>
-                <span class="highlight-green">Tailored For Your Goals</span>
-            </h1>
-            <p class="hero-description">
-                Transform your workout routine with AI-driven precision. Enter your profile, select your target goal, and get an instant, structured 7-day training schedule complete with sets, reps, and nutrition guidance.
-            </p>
-            <div class="hero-actions">
-                <a href="#planner-section" class="btn btn-primary btn-large">
-                    Create My Plan <span>↓</span>
-                </a>
-                <a href="/history" class="btn btn-secondary btn-large">
-                    View Saved Plans
-                </a>
-            </div>
+            <div class="hero-grid">
+                <!-- Left Column -->
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span class="pulse-dot"></span> Powered by Google Gemini AI
+                    </div>
+                    <h1 class="hero-title">
+                        Your Fitness. <br>
+                        <span class="highlight-green">Your Plan.</span>
+                    </h1>
+                    <p class="hero-description">
+                        Get a science-backed, personalized 7-day workout routine generated dynamically by Gemini AI. Complete with sets, reps, tailored nutrition guidance, and smart rest intervals.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#planner-section" class="btn btn-primary btn-large">
+                            Create My Plan <span>↓</span>
+                        </a>
+                        <a href="/history" class="btn btn-secondary btn-large">
+                            View Saved Plans
+                        </a>
+                    </div>
 
-            <!-- Authentic Feature Highlights -->
-            <div class="hero-features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">📅</div>
-                    <h3>7-Day Structured Routine</h3>
-                    <p>Day-by-day workout breakdowns with exact exercises, duration, sets, and rest intervals.</p>
+                    <!-- Authentic Stats Bar -->
+                    <div class="hero-stats-row">
+                        <div>
+                            <div class="stat-item-val">7 Days</div>
+                            <div class="stat-item-lbl">Full Routine</div>
+                        </div>
+                        <div>
+                            <div class="stat-item-val">100% Free</div>
+                            <div class="stat-item-lbl">Open Architecture</div>
+                        </div>
+                        <div>
+                            <div class="stat-item-val">SQLite</div>
+                            <div class="stat-item-lbl">Local Persistence</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🥗</div>
-                    <h3>Nutrition & Recovery</h3>
-                    <p>Goal-specific dietary guidance and recovery methods to optimize muscular repair and energy.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔄</div>
-                    <h3>AI Feedback Loop</h3>
-                    <p>Refine and adapt your schedule anytime using natural language prompts processed by Gemini.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">💾</div>
-                    <h3>Local SQLite History</h3>
-                    <p>All routines are automatically saved to your local database for easy tracking and review.</p>
+
+                <!-- Right Column: Visual with Floating Cards -->
+                <div class="hero-visual-wrapper">
+                    <!-- Floating Card 1: AI Fitness Plan -->
+                    <div class="hero-floating-card hero-card-1">
+                        <span class="floating-card-icon">🤖</span>
+                        <div>
+                            <div class="floating-card-title">AI Fitness Plan</div>
+                            <div class="floating-card-subtitle">Custom calibrated routine</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Athletic Visual Card -->
+                    <div class="hero-image-card">
+                        <img src="/static/hero_athlete.jpg" alt="Athletic Training - FitBuddy AI" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=800&auto=format&fit=crop';">
+                    </div>
+
+                    <!-- Floating Card 2: Workout Timer -->
+                    <div class="hero-floating-card hero-card-2">
+                        <span class="floating-card-icon">⏱️</span>
+                        <div>
+                            <div class="floating-card-title">Workout Timer</div>
+                            <div class="floating-card-subtitle">Active set intervals</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Main Content / Form Section -->
+    <!-- Feature Section (Dark Section) -->
+    <section class="features-section">
+        <div class="features-container">
+            <div class="features-header">
+                <span class="features-subtitle">Engineered For Results</span>
+                <h2 class="features-title">Every Tool You Need To Succeed</h2>
+            </div>
+
+            <div class="features-grid">
+                <!-- 🤖 AI Fitness Plans -->
+                <div class="feature-box">
+                    <div class="feature-box-icon">🤖</div>
+                    <h3>AI Fitness Plans</h3>
+                    <p>Personalized 7-day workout plans generated by Gemini based on your age, weight, and goals.</p>
+                </div>
+
+                <!-- 🏋️ Smart Workouts -->
+                <div class="feature-box">
+                    <div class="feature-box-icon">🏋️</div>
+                    <h3>Smart Workouts</h3>
+                    <p>Structured exercise sets, repetitions, targeted muscle groups, and coach form tips.</p>
+                </div>
+
+                <!-- 🥗 Nutrition Tips -->
+                <div class="feature-box">
+                    <div class="feature-box-icon">🥗</div>
+                    <h3>Nutrition Tips</h3>
+                    <p>Goal-specific dietary guidance, hydration targets, and muscular recovery habits.</p>
+                </div>
+
+                <!-- ⏱️ Workout Timer -->
+                <div class="feature-box">
+                    <div class="feature-box-icon">⏱️</div>
+                    <h3>Workout Timer</h3>
+                    <p>Interval pacing for work sets and recovery breaks to keep your sessions on schedule.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content / Planner Form Section -->
     <main class="main-content" id="planner-section">
         <div class="form-container-card">
             <div class="form-header">
                 <div class="form-icon-circle">🏋️</div>
-                <h2>Generate Your 7-Day Fitness Plan</h2>
-                <p>Fill in your basic details below to receive a custom routine calibrated to your fitness level.</p>
+                <h2>Generate Your AI Fitness Plan</h2>
+                <p>Fill in your basic metrics below to receive a custom routine calibrated to your fitness level.</p>
             </div>
 
             <!-- Error Notification Banner (if any) -->
@@ -100,7 +163,7 @@
                 <!-- Name Field -->
                 <div class="form-group">
                     <label for="name" class="form-label">
-                        Your Name <span class="required-star">*</span>
+                        Your Full Name <span class="required-star">*</span>
                     </label>
                     <input 
                         type="text" 
@@ -113,7 +176,7 @@
                         maxlength="50"
                         autocomplete="name"
                     >
-                    <small class="field-hint">Used to personalize your workout plan cards.</small>
+                    <small class="field-hint">Used to personalize your 7-day routine cards.</small>
                     <span class="field-error" id="nameError"></span>
                 </div>
 
@@ -128,13 +191,13 @@
                             id="age" 
                             name="age" 
                             class="form-input" 
-                            placeholder="e.g., 22" 
+                            placeholder="e.g., 24" 
                             value="{{ form_data.age if form_data else '' }}" 
-                            min="12" 
+                            min="10" 
                             max="100" 
                             required
                         >
-                        <small class="field-hint">Accepts values 12 to 100.</small>
+                        <small class="field-hint">Accepts values 10 to 100.</small>
                         <span class="field-error" id="ageError"></span>
                     </div>
 
@@ -217,7 +280,7 @@
                         Workout Intensity <span class="required-star">*</span>
                     </label>
                     <div class="intensity-selector">
-                        <label class="intensity-chip chip-low">
+                        <label class="intensity-chip">
                             <input 
                                 type="radio" 
                                 name="intensity" 
@@ -226,11 +289,11 @@
                                 required
                             >
                             <span class="chip-label">
-                                <span class="chip-icon">🚶</span> Low (Gentle & Beginner)
+                                <span>🌱</span> Low (Gentle)
                             </span>
                         </label>
 
-                        <label class="intensity-chip chip-medium">
+                        <label class="intensity-chip">
                             <input 
                                 type="radio" 
                                 name="intensity" 
@@ -238,11 +301,11 @@
                                 {% if (form_data and form_data.intensity == 'Medium') or not form_data %}checked{% endif %}
                             >
                             <span class="chip-label">
-                                <span class="chip-icon">🏃</span> Medium (Moderate & Balanced)
+                                <span>⚡</span> Medium (Balanced)
                             </span>
                         </label>
 
-                        <label class="intensity-chip chip-high">
+                        <label class="intensity-chip">
                             <input 
                                 type="radio" 
                                 name="intensity" 
@@ -250,7 +313,7 @@
                                 {% if form_data and form_data.intensity == 'High' %}checked{% endif %}
                             >
                             <span class="chip-label">
-                                <span class="chip-icon">⚡</span> High (Challenging & Rigorous)
+                                <span>🔥</span> High (Rigorous)
                             </span>
                         </label>
                     </div>
@@ -259,9 +322,9 @@
 
                 <!-- Submit Button -->
                 <div class="form-submit-wrapper">
-                    <button type="submit" id="generateBtn" class="btn btn-primary btn-submit">
-                        <span class="btn-text">Generate My Fitness Plan</span>
-                        <span class="btn-arrow">→</span>
+                    <button type="submit" id="generateBtn" class="btn btn-submit">
+                        <span class="btn-text">Generate My AI Fitness Plan</span>
+                        <span class="btn-arrow">⚡</span>
                     </button>
                 </div>
             </form>
