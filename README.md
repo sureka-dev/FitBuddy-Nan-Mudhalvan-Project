@@ -142,7 +142,3 @@ The main objective of FitBuddy is to provide users with a simple and personalize
 **FitBuddy – AI Fitness Plan Generator using Gemini Models**
 
 Developed as part of the **SkillWallet / Nan Mudhalvan Generative AI project**.
-
----
-
-⭐ If you find this project useful, consider giving the repository a star!
