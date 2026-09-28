@@ -1,0 +1,16 @@
+# Python Environment
+.env
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite Database
+database/*.db
+
+# OS / Editor files
+.DS_Store
+.vscode/
+.idea/

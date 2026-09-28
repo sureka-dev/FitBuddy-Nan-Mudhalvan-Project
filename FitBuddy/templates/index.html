@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitBuddy – AI Fitness Plan Generator</title>
+    <meta name="description" content="FitBuddy is an AI-powered fitness companion using Gemini to create tailored 7-day workout plans.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cabinet+Grotesk:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="brand-logo">
+                <span class="brand-icon">⚡</span>
+                <span class="brand-text">FITBUDDY</span>
+            </a>
+            <div class="nav-tagline">Your AI-Powered Fitness Companion</div>
+            <div class="nav-links">
+                <a href="/" class="nav-link active">Home</a>
+                <a href="#planner-section" class="nav-link">Create Plan</a>
+                <a href="/history" class="nav-link">Plan History</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero-section">
+        <div class="hero-container">
+            <div class="hero-badge">
+                <span class="pulse-dot"></span> Powered by Google Gemini AI
+            </div>
+            <h1 class="hero-title">
+                Smart, Personalized Fitness Plans <br>
+                <span class="highlight-green">Tailored For Your Goals</span>
+            </h1>
+            <p class="hero-description">
+                Transform your workout routine with AI-driven precision. Enter your profile, select your target goal, and get an instant, structured 7-day training schedule complete with sets, reps, and nutrition guidance.
+            </p>
+            <div class="hero-actions">
+                <a href="#planner-section" class="btn btn-primary btn-large">
+                    Create My Plan <span>↓</span>
+                </a>
+                <a href="/history" class="btn btn-secondary btn-large">
+                    View Saved Plans
+                </a>
+            </div>
+
+            <!-- Authentic Feature Highlights -->
+            <div class="hero-features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📅</div>
+                    <h3>7-Day Structured Routine</h3>
+                    <p>Day-by-day workout breakdowns with exact exercises, duration, sets, and rest intervals.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🥗</div>
+                    <h3>Nutrition & Recovery</h3>
+                    <p>Goal-specific dietary guidance and recovery methods to optimize muscular repair and energy.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>AI Feedback Loop</h3>
+                    <p>Refine and adapt your schedule anytime using natural language prompts processed by Gemini.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💾</div>
+                    <h3>Local SQLite History</h3>
+                    <p>All routines are automatically saved to your local database for easy tracking and review.</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content / Form Section -->
+    <main class="main-content" id="planner-section">
+        <div class="form-container-card">
+            <div class="form-header">
+                <div class="form-icon-circle">🏋️</div>
+                <h2>Generate Your 7-Day Fitness Plan</h2>
+                <p>Fill in your basic details below to receive a custom routine calibrated to your fitness level.</p>
+            </div>
+
+            <!-- Error Notification Banner (if any) -->
+            {% if error_message %}
+            <div class="alert alert-error" role="alert">
+                <span class="alert-icon">⚠️</span>
+                <div class="alert-content">
+                    <strong>Notice:</strong> {{ error_message }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Planner Form -->
+            <form action="/generate-plan" method="POST" id="fitnessPlanForm" class="planner-form" novalidate>
+                <!-- Name Field -->
+                <div class="form-group">
+                    <label for="name" class="form-label">
+                        Your Name <span class="required-star">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="name" 
+                        name="name" 
+                        class="form-input" 
+                        placeholder="e.g., Alex Morgan" 
+                        value="{{ form_data.name if form_data else '' }}" 
+                        required
+                        maxlength="50"
+                        autocomplete="name"
+                    >
+                    <small class="field-hint">Used to personalize your workout plan cards.</small>
+                    <span class="field-error" id="nameError"></span>
+                </div>
+
+                <!-- Age & Weight Grid -->
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="age" class="form-label">
+                            Age (Years) <span class="required-star">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="age" 
+                            name="age" 
+                            class="form-input" 
+                            placeholder="e.g., 22" 
+                            value="{{ form_data.age if form_data else '' }}" 
+                            min="12" 
+                            max="100" 
+                            required
+                        >
+                        <small class="field-hint">Accepts values 12 to 100.</small>
+                        <span class="field-error" id="ageError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="weight" class="form-label">
+                            Weight (in kg) <span class="required-star">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="weight" 
+                            name="weight" 
+                            step="0.5" 
+                            class="form-input" 
+                            placeholder="e.g., 68.5" 
+                            value="{{ form_data.weight if form_data else '' }}" 
+                            min="25" 
+                            max="300" 
+                            required
+                        >
+                        <small class="field-hint">Accepts values 25 to 300 kg.</small>
+                        <span class="field-error" id="weightError"></span>
+                    </div>
+                </div>
+
+                <!-- Fitness Goal Field -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Primary Fitness Goal <span class="required-star">*</span>
+                    </label>
+                    <div class="options-grid">
+                        <label class="option-card">
+                            <input 
+                                type="radio" 
+                                name="goal" 
+                                value="Weight Loss" 
+                                {% if form_data and form_data.goal == 'Weight Loss' %}checked{% endif %}
+                                required
+                            >
+                            <div class="option-content">
+                                <span class="option-icon">🔥</span>
+                                <span class="option-title">Weight Loss</span>
+                                <span class="option-desc">Caloric deficit, HIIT & fat-burning metabolic circuits</span>
+                            </div>
+                        </label>
+
+                        <label class="option-card">
+                            <input 
+                                type="radio" 
+                                name="goal" 
+                                value="Muscle Gain" 
+                                {% if (form_data and form_data.goal == 'Muscle Gain') or not form_data %}checked{% endif %}
+                            >
+                            <div class="option-content">
+                                <span class="option-icon">💪</span>
+                                <span class="option-title">Muscle Gain</span>
+                                <span class="option-desc">Progressive resistance training & hypertrophy focus</span>
+                            </div>
+                        </label>
+
+                        <label class="option-card">
+                            <input 
+                                type="radio" 
+                                name="goal" 
+                                value="General Wellness" 
+                                {% if form_data and form_data.goal == 'General Wellness' %}checked{% endif %}
+                            >
+                            <div class="option-content">
+                                <span class="option-icon">🌿</span>
+                                <span class="option-title">General Wellness</span>
+                                <span class="option-desc">Cardiovascular health, functional mobility & longevity</span>
+                            </div>
+                        </label>
+                    </div>
+                    <span class="field-error" id="goalError"></span>
+                </div>
+
+                <!-- Workout Intensity Field -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Workout Intensity <span class="required-star">*</span>
+                    </label>
+                    <div class="intensity-selector">
+                        <label class="intensity-chip chip-low">
+                            <input 
+                                type="radio" 
+                                name="intensity" 
+                                value="Low" 
+                                {% if form_data and form_data.intensity == 'Low' %}checked{% endif %}
+                                required
+                            >
+                            <span class="chip-label">
+                                <span class="chip-icon">🚶</span> Low (Gentle & Beginner)
+                            </span>
+                        </label>
+
+                        <label class="intensity-chip chip-medium">
+                            <input 
+                                type="radio" 
+                                name="intensity" 
+                                value="Medium" 
+                                {% if (form_data and form_data.intensity == 'Medium') or not form_data %}checked{% endif %}
+                            >
+                            <span class="chip-label">
+                                <span class="chip-icon">🏃</span> Medium (Moderate & Balanced)
+                            </span>
+                        </label>
+
+                        <label class="intensity-chip chip-high">
+                            <input 
+                                type="radio" 
+                                name="intensity" 
+                                value="High" 
+                                {% if form_data and form_data.intensity == 'High' %}checked{% endif %}
+                            >
+                            <span class="chip-label">
+                                <span class="chip-icon">⚡</span> High (Challenging & Rigorous)
+                            </span>
+                        </label>
+                    </div>
+                    <span class="field-error" id="intensityError"></span>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-submit-wrapper">
+                    <button type="submit" id="generateBtn" class="btn btn-primary btn-submit">
+                        <span class="btn-text">Generate My Fitness Plan</span>
+                        <span class="btn-arrow">→</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Health Safety & Medical Notice -->
+        <div class="disclaimer-banner">
+            <div class="disclaimer-icon">🛡️</div>
+            <div class="disclaimer-text">
+                <strong>Health & Safety Guidance:</strong> FitBuddy provides general fitness guidance and is not a substitute for professional medical, nutritional, or fitness advice. Consult a qualified healthcare or fitness professional if you have medical conditions, injuries, or concerns before starting a new exercise program.
+            </div>
+        </div>
+    </main>
+
+    <!-- Full-screen Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" aria-hidden="true">
+        <div class="loading-card">
+            <div class="spinner-ring"></div>
+            <h3 class="loading-title">Creating your personalized fitness plan...</h3>
+            <p class="loading-subtitle" id="loadingStepText">Connecting with Google Gemini AI to analyze your goals...</p>
+            <div class="loading-bar-track">
+                <div class="loading-bar-fill"></div>
+            </div>
+            <span class="loading-note">Please keep this window open while Gemini designs your routine.</span>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="brand-logo-small">⚡ FITBUDDY</span>
+                <p>AI Fitness Plan Generator – College Nan Mudhalvan / SkillWallet Project</p>
+            </div>
+            <div class="footer-tech-stack">
+                <span class="tech-tag">Python 3.13</span>
+                <span class="tech-tag">FastAPI</span>
+                <span class="tech-tag">Jinja2</span>
+                <span class="tech-tag">SQLite</span>
+                <span class="tech-tag">Google Gemini</span>
+            </div>
+            <div class="footer-copy">
+                &copy; FitBuddy Academic Demonstration. All data stored locally in SQLite.
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
