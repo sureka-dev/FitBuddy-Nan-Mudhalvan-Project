@@ -40,9 +40,12 @@ import {
   ExternalLink,
   SkipForward,
   FastForward,
-  Check
+  Check,
+  Download,
+  Utensils,
+  FileText
 } from 'lucide-react';
-import { generateFitBuddyPdf } from './utils/pdfGenerator';
+import { generateFitBuddyPdf, generateNutritionPlanPdf } from './utils/pdfGenerator';
 import {
   matchExerciseInDb,
   getExerciseImageUrl,
@@ -51,6 +54,11 @@ import {
   initializeExerciseDb,
   subscribeExerciseDb
 } from './utils/exerciseDb';
+import {
+  getOrGenerate7DayNutritionPlan,
+  calculateUserNutritionMetrics
+} from './utils/nutritionGenerator';
+import { DayNutritionPlan } from './types';
 
 interface Exercise {
   name: string;
@@ -100,6 +108,7 @@ interface FitnessPlanData {
   summary: string;
   days: DayPlan[];
   sample_meal_plan?: SampleMealPlan;
+  nutrition_plan_7days?: DayNutritionPlan[];
   nutrition_tip: string;
   recovery_tip: string;
   hydration_tip?: string;
@@ -175,7 +184,8 @@ function ExerciseThumbnail({ name, className = "w-12 h-12" }: { name: string; cl
 
 export default function App() {
   // Navigation & Theme States
-  const [viewMode, setViewMode] = useState<'main' | 'history'>('main');
+  const [isSavedPlansModalOpen, setIsSavedPlansModalOpen] = useState(false);
+  const [weightInputError, setWeightInputError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('fitbuddy_theme') === 'dark';
   });
@@ -269,6 +279,7 @@ export default function App() {
   });
   const [isLogWeightModalOpen, setIsLogWeightModalOpen] = useState(false);
   const [newWeightInput, setNewWeightInput] = useState('');
+  const [newWeightDateInput, setNewWeightDateInput] = useState('Today');
 
   // Water Intake Tracker (Starts at 0 / 7 glasses for every newly generated plan/user session)
   const [waterGlasses, setWaterGlasses] = useState<number>(() => {
@@ -391,7 +402,9 @@ export default function App() {
     }
   }, [streakCount]);
 
-  // Load saved plans on mount (sync server storage + localStorage)
+  // Load saved plans on mount (sync server storage + localStorage into Saved Plans list)
+  // NOTE: Do not automatically set currentPlan on page load.
+  // The workout schedule and nutrition plan should ONLY appear after the user enters their details and generates a plan.
   useEffect(() => {
     async function initPlans() {
       let cachedPlans: StoredPlanRecord[] = [];
@@ -402,7 +415,6 @@ export default function App() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             cachedPlans = parsed;
             setSavedPlans(cachedPlans);
-            setCurrentPlan((prev) => prev || cachedPlans[0]);
           }
         }
       } catch (e) {
@@ -417,7 +429,6 @@ export default function App() {
             if (serverPlans.length > 0) {
               setSavedPlans(serverPlans);
               localStorage.setItem('fitbuddy_sqlite_plans', JSON.stringify(serverPlans));
-              setCurrentPlan((prev) => prev || serverPlans[0]);
             } else if (cachedPlans.length > 0) {
               for (const p of cachedPlans) {
                 fetch('/api/plans', {
@@ -1527,7 +1538,7 @@ export default function App() {
       if (currentPlan && currentPlan.id === targetId) {
         setCurrentPlan(updatedList.length > 0 ? updatedList[0] : null);
       }
-      setSuccessMessage(`Plan for ${targetName} was deleted from history.`);
+      setSuccessMessage(`Plan for ${targetName} was deleted.`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setErrorMessage('Could not delete plan.');
@@ -1567,29 +1578,45 @@ export default function App() {
     return Math.round((completedCount / totalDays) * 100);
   }, [currentPlan, completedDays]);
 
-  // Real weight logging with actual dates (Requirement #4)
-  const handleSaveWeightLogModal = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(newWeightInput);
-    if (!val || val < 20 || val > 350) return;
+  // Real weight logging with actual dates and validation (Requirement #4)
+  const handleSaveWeightLogModal = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newWeightInput.trim();
+    const val = parseFloat(trimmed);
+
+    if (!trimmed || isNaN(val) || val <= 0) {
+      setWeightInputError('Please enter a valid positive weight in kg (e.g. 72).');
+      return;
+    }
+    if (val < 10 || val > 450) {
+      setWeightInputError('Please enter a realistic weight in kg (e.g. 72 or 71.5).');
+      return;
+    }
+    setWeightInputError(null);
 
     const now = new Date();
-    const label = weightLogs.length === 0 ? 'Today' : now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const todayFormatted = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    let label = newWeightDateInput.trim();
+    if (!label) {
+      label = weightLogs.length === 0 ? 'Today' : todayFormatted;
+    }
+
     const newEntry: WeightLogEntry = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
       date: label,
       weight: Math.round(val * 10) / 10
     };
 
-    setWeightLogs((prev) => {
-      const next = [...prev, newEntry];
-      try {
-        localStorage.setItem('fitbuddy_weight_logs', JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+    const nextLogs = [...weightLogs, newEntry];
+    setWeightLogs(nextLogs);
+    try {
+      localStorage.setItem('fitbuddy_weight_logs', JSON.stringify(nextLogs));
+    } catch (err) {
+      console.warn('Could not save weight log to localStorage', err);
+    }
 
     setNewWeightInput('');
+    setNewWeightDateInput('Today');
     setIsLogWeightModalOpen(false);
   };
 
@@ -1674,7 +1701,6 @@ export default function App() {
         {/* Logo */}
         <a
           href="#home"
-          onClick={() => setViewMode('main')}
           className="flex items-center gap-2.5 text-[23px] font-extrabold tracking-tight group no-underline"
         >
           <div className="w-[42px] h-[42px] bg-[#d9f65b] rounded-[13px] flex items-center justify-center text-[23px] -rotate-6 transition-transform group-hover:rotate-0 shadow-xs">
@@ -1688,7 +1714,6 @@ export default function App() {
           <div className="hidden md:flex items-center gap-6">
             <a
               href="#home"
-              onClick={() => setViewMode('main')}
               className={`font-semibold text-sm transition ${
                 darkMode ? 'text-gray-300 hover:text-[#d9f65b]' : 'text-[#374137] hover:text-[#73a900]'
               }`}
@@ -1697,7 +1722,6 @@ export default function App() {
             </a>
             <a
               href="#features"
-              onClick={() => setViewMode('main')}
               className={`font-semibold text-sm transition ${
                 darkMode ? 'text-gray-300 hover:text-[#d9f65b]' : 'text-[#374137] hover:text-[#73a900]'
               }`}
@@ -1706,7 +1730,6 @@ export default function App() {
             </a>
             <a
               href="#planner"
-              onClick={() => setViewMode('main')}
               className={`font-semibold text-sm transition ${
                 darkMode ? 'text-gray-300 hover:text-[#d9f65b]' : 'text-[#374137] hover:text-[#73a900]'
               }`}
@@ -1715,29 +1738,12 @@ export default function App() {
             </a>
             <a
               href="#how"
-              onClick={() => setViewMode('main')}
               className={`font-semibold text-sm transition ${
                 darkMode ? 'text-gray-300 hover:text-[#d9f65b]' : 'text-[#374137] hover:text-[#73a900]'
               }`}
             >
               How It Works
             </a>
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'history' ? 'main' : 'history')}
-              className={`font-semibold text-sm transition flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'history'
-                  ? 'text-[#7da800] font-bold'
-                  : darkMode ? 'text-gray-300 hover:text-[#d9f65b]' : 'text-[#374137] hover:text-[#73a900]'
-              }`}
-            >
-              <span>History</span>
-              {savedPlans.length > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#182018] text-[#d9f65b] text-[11px] font-bold flex items-center justify-center">
-                  {savedPlans.length}
-                </span>
-              )}
-            </button>
           </div>
 
           {/* Dark/Light Mode Toggle (Requirement #7) */}
@@ -1757,7 +1763,6 @@ export default function App() {
 
           <a
             href="#planner"
-            onClick={() => setViewMode('main')}
             className="bg-[#182018] hover:bg-black text-[#d9f65b] text-sm font-bold px-5 py-2.5 rounded-full transition shadow-xs no-underline"
           >
             Get Started
@@ -1829,148 +1834,13 @@ export default function App() {
           </div>
         )}
 
-        {/* =========================================================================
-            HISTORY VIEW (Saved Plans)
-           ========================================================================= */}
-        {viewMode === 'history' && (
-          <section className="pt-28 pb-20 px-[7%] max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200 dark:border-gray-800">
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('main')}
-                  className="text-xs font-bold text-[#7da800] uppercase tracking-wider mb-1 flex items-center gap-1 hover:underline cursor-pointer"
-                >
-                  ← Back to Planner
-                </button>
-                <h1 className="text-3xl font-black">Saved Fitness Plans</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Stored in local database ({savedPlans.length} records).
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('main');
-                  const el = document.getElementById('planner');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="bg-[#182018] text-[#d9f65b] font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-black transition shadow-xs cursor-pointer"
-              >
-                + New Plan
-              </button>
-            </div>
-
-            {savedPlans.length === 0 ? (
-              <div className={`rounded-3xl p-12 text-center border shadow-xs ${
-                darkMode ? 'bg-[#182018] border-gray-800' : 'bg-white border-[#e7ece5]'
-              }`}>
-                <div className="text-5xl mb-3">📁</div>
-                <h3 className="font-extrabold text-lg mb-1">No Saved Plans Yet</h3>
-                <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
-                  Fill in your profile in the planner section to generate your first AI fitness plan.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode('main');
-                    const el = document.getElementById('planner');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="bg-[#d9f65b] text-[#182018] font-bold text-sm px-6 py-3 rounded-xl hover:scale-105 transition shadow-xs cursor-pointer"
-                >
-                  Go to Planner
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedPlans.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`border rounded-2xl p-5 hover:border-[#9fc82c] transition flex flex-col justify-between shadow-xs ${
-                      darkMode ? 'bg-[#182018] border-gray-800' : 'bg-white border-[#e7ebe4]'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#7da800]">
-                          Plan #{item.id}
-                        </span>
-                        <span className="text-[11px] text-gray-400 font-medium">
-                          {item.created_at}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-black mb-1">
-                        {item.name}'s Routine
-                      </h3>
-                      <div className="flex flex-wrap gap-1.5 text-xs font-semibold mb-3">
-                        <span className="bg-[#f5f8f2] dark:bg-gray-800 px-2 py-0.5 rounded-md text-gray-700 dark:text-gray-300">
-                          {item.age} yrs · {item.weight} kg {item.height ? `· ${item.height} cm` : ''}
-                        </span>
-                        <span className="bg-[#eef8c9] text-[#4d7000] px-2 py-0.5 rounded-md font-bold">
-                          {item.goal}
-                        </span>
-                        <span className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-md">
-                          {item.intensity} Intensity
-                        </span>
-                        {item.diet && (
-                          <span className="bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-md">
-                            🥗 {item.diet}
-                          </span>
-                        )}
-                      </div>
-                      {item.feedback && (
-                        <p className="text-xs text-blue-800 dark:text-blue-300 italic bg-blue-50 dark:bg-blue-950/30 p-2 rounded-lg mb-3">
-                          Updated with: "{item.feedback}"
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCurrentPlan(item);
-                          setViewMode('main');
-                          setTimeout(() => {
-                            const res = document.getElementById('result');
-                            if (res) res.scrollIntoView({ behavior: 'smooth' });
-                          }, 100);
-                        }}
-                        className="text-xs font-bold text-[#182018] bg-[#d9f65b] px-3.5 py-1.5 rounded-lg hover:opacity-90 transition cursor-pointer"
-                      >
-                        View Routine →
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateDelete(item)}
-                        className="text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer"
-                        title={`Delete ${item.name}'s plan`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* =========================================================================
-            MAIN LANDING & PLANNER VIEW
-           ========================================================================= */}
-        {viewMode === 'main' && (
-          <>
-            {/* ================= HERO SECTION ================= */}
-            <section
-              className={`hero-gradient min-h-[92vh] pt-32 pb-20 px-[7%] grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12 ${
-                darkMode ? 'dark:bg-none' : ''
-              }`}
-              id="home"
-            >
+        {/* ================= HERO SECTION ================= */}
+        <section
+          className={`hero-gradient min-h-[92vh] pt-32 pb-20 px-[7%] grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12 ${
+            darkMode ? 'dark:bg-none' : ''
+          }`}
+          id="home"
+        >
               {/* Left Content */}
               <div className="animate-slide-left">
                 <div className="inline-block px-4 py-2 bg-white dark:bg-gray-800 border border-[#e1e8dc] dark:border-gray-700 rounded-full text-xs font-extrabold mb-6 shadow-xs tracking-wider text-[#182018] dark:text-[#d9f65b]">
@@ -1982,24 +1852,27 @@ export default function App() {
                   Your <span className="text-[#78a800] dark:text-[#d9f65b]">Plan.</span>
                 </h1>
 
-                <p className="text-base sm:text-lg text-[#697269] dark:text-gray-300 max-w-[540px] leading-relaxed mb-6">
+                <p className="text-base sm:text-lg text-[#1A1A1A] max-w-[540px] leading-relaxed mb-6 font-medium">
                   Build an adaptive 7-day routine with warm-ups, structured workouts, tailored rest days, macro guidance, and a smart interval timer.
                 </p>
 
-                {/* Motivational Quote Banner (Requirement #7) */}
+                {/* Motivational Quote Banner (Soft Warm Cream #FFF4D6) */}
                 <div
                   onClick={nextQuote}
-                  className="bg-white/80 dark:bg-gray-800/80 border border-[#e5eadf] dark:border-gray-700 rounded-2xl p-4 mb-8 max-w-[540px] cursor-pointer hover:border-[#9fc82c] transition shadow-xs group"
+                  className="bg-[#FFF4D6] border border-[#f2e1b6] rounded-2xl p-4 sm:p-5 mb-8 max-w-[540px] cursor-pointer hover:border-[#7da800] transition shadow-xs group select-none"
                   title="Click for next motivational quote"
                 >
-                  <div className="flex items-center justify-between text-[11px] font-bold text-[#7da800] uppercase tracking-wider mb-1">
-                    <span className="flex items-center gap-1">✨ Daily Fuel</span>
-                    <span className="text-gray-400 group-hover:text-[#7da800] transition">Click to shuffle ↻</span>
+                  <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[#537700]">✨ DAILY FUEL</span>
+                    <span className="text-[#2b332b] text-[11px] font-semibold group-hover:text-[#537700] transition flex items-center gap-1">
+                      <span>CLICK TO SHUFFLE</span>
+                      <span className="text-xs">↻</span>
+                    </span>
                   </div>
-                  <p className="text-xs sm:text-sm italic font-medium">
+                  <p className="text-xs sm:text-sm italic font-bold text-[#1A1A1A] leading-snug">
                     "{MOTIVATIONAL_QUOTES[quoteIdx].text}"
                   </p>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 block">
+                  <span className="text-[11px] font-medium text-[#4a554a] mt-1 block">
                     — {MOTIVATIONAL_QUOTES[quoteIdx].author}
                   </span>
                 </div>
@@ -2453,10 +2326,10 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setViewMode('history')}
+                            onClick={() => setIsSavedPlansModalOpen(true)}
                             className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Calendar className="w-4 h-4" /> Saved Plans ({savedPlans.length})
+                            <Calendar className="w-4 h-4 text-[#d9f65b]" /> Saved Plans ({savedPlans.length})
                           </button>
                         </div>
                         {pdfError && (
@@ -2897,10 +2770,12 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => {
-                                setNewWeightInput(currentPlan ? currentPlan.weight.toString() : '');
+                                setNewWeightInput('');
+                                setNewWeightDateInput('Today');
+                                setWeightInputError(null);
                                 setIsLogWeightModalOpen(true);
                               }}
-                              className="bg-[#182018] hover:bg-black text-[#d9f65b] font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md"
+                              className="bg-[#182018] hover:bg-black text-[#d9f65b] font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
                             >
                               <Plus className="w-4 h-4" />
                               <span>+ Log Weight</span>
@@ -2908,7 +2783,7 @@ export default function App() {
                           </div>
                         </div>
                       ) : (
-                        /* Real Weight Trend when user has real entries (Requirement #4) */
+                        /* Real Weight Trend when user has real entries (Requirement #4 & #5) */
                         <div>
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <div>
@@ -2923,10 +2798,12 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => {
-                                setNewWeightInput(weightLogs[weightLogs.length - 1]?.weight?.toString() || '');
+                                setNewWeightInput('');
+                                setNewWeightDateInput('Today');
+                                setWeightInputError(null);
                                 setIsLogWeightModalOpen(true);
                               }}
-                              className="bg-[#182018] hover:bg-black text-[#d9f65b] font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-sm self-start sm:self-auto"
+                              className="bg-[#182018] hover:bg-black text-[#d9f65b] font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98] self-start sm:self-auto"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>+ Log Weight</span>
@@ -2938,9 +2815,14 @@ export default function App() {
                             <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100 text-xs">
                               <div>
                                 <span className="text-gray-500 font-medium block">Current Log:</span>
-                                <span className="text-lg font-black text-[#182018]">
-                                  {weightLogs[weightLogs.length - 1].weight} kg
-                                </span>
+                                <div className="flex items-baseline gap-2 mt-0.5">
+                                  <span className="text-2xl sm:text-3xl font-black text-[#182018]">
+                                    {weightLogs[weightLogs.length - 1].weight} kg
+                                  </span>
+                                  <span className="text-xs font-bold text-[#7da800] bg-[#d9f65b]/20 px-2.5 py-0.5 rounded-full">
+                                    {weightLogs[weightLogs.length - 1].date}
+                                  </span>
+                                </div>
                               </div>
                               {weightLogs.length > 1 && (
                                 <div className="text-right">
@@ -2957,7 +2839,7 @@ export default function App() {
                               )}
                             </div>
 
-                            {/* Responsive SVG Bar Chart */}
+                            {/* Responsive Bar Chart */}
                             <div className="h-44 w-full relative flex items-end justify-between px-2 sm:px-6 pb-6 pt-2">
                               {weightLogs.map((entry, idx) => {
                                 const range = Math.max(1, weightMax - weightMin);
@@ -2980,19 +2862,19 @@ export default function App() {
                               })}
                             </div>
 
-                            {/* Real Entry Pills with delete */}
+                            {/* Real Entry Cards with delete */}
                             <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
                               {weightLogs.map((entry, idx) => (
                                 <div
                                   key={entry.id || idx}
-                                  className="bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs flex items-center gap-2 shadow-2xs"
+                                  className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs flex items-center gap-2 shadow-2xs hover:border-[#7da800] transition"
                                 >
                                   <span className="font-bold text-[#182018]">{entry.weight} kg</span>
-                                  <span className="text-gray-400 text-[10px]">{entry.date}</span>
+                                  <span className="text-gray-500 text-[11px]">— {entry.date}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteWeightLog(entry.id)}
-                                    className="text-gray-300 hover:text-red-500 transition cursor-pointer text-xs ml-0.5"
+                                    className="text-gray-300 hover:text-red-500 transition cursor-pointer text-sm font-bold ml-1"
                                     title="Delete this entry"
                                   >
                                     ×
@@ -3108,8 +2990,6 @@ export default function App() {
                 </div>
               </div>
             </section>
-          </>
-        )}
       </main>
 
       {/* =========================================================================
@@ -3446,6 +3326,276 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          LOG WEIGHT MODAL (Requirement #4)
+         ========================================================================= */}
+      {isLogWeightModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] backdrop-blur-sm p-4 no-print overflow-y-auto"
+          onClick={() => {
+            setIsLogWeightModalOpen(false);
+            setWeightInputError(null);
+          }}
+        >
+          <div
+            className={`w-[min(440px,94%)] p-6 sm:p-7 rounded-[28px] shadow-2xl border animate-pop relative my-auto ${
+              darkMode ? 'bg-[#182018] text-white border-gray-700' : 'bg-white text-[#182018] border-gray-100'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setIsLogWeightModalOpen(false);
+                setWeightInputError(null);
+              }}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-[#d9f65b]/20 text-[#7da800] dark:text-[#d9f65b] flex items-center justify-center text-2xl mb-4 shadow-inner">
+              ⚖️
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-black mb-1 font-['Cabinet_Grotesk']">
+              Enter your weight
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
+              Track your real progress by logging your current body weight in kilograms.
+            </p>
+
+            <form onSubmit={handleSaveWeightLogModal} noValidate className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Weight (kg)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    autoFocus
+                    placeholder="e.g. 72"
+                    value={newWeightInput}
+                    onChange={(e) => {
+                      setNewWeightInput(e.target.value);
+                      if (weightInputError) setWeightInputError(null);
+                    }}
+                    className={`w-full px-4 py-3 rounded-xl border text-lg font-black transition outline-hidden ${
+                      weightInputError
+                        ? 'border-red-500 bg-red-50/30'
+                        : darkMode
+                        ? 'bg-gray-800 border-gray-700 text-white focus:border-[#d9f65b]'
+                        : 'bg-white border-gray-300 text-[#182018] focus:border-[#7da800] focus:ring-2 focus:ring-[#7da800]/20'
+                    }`}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+                    kg
+                  </span>
+                </div>
+                {weightInputError && (
+                  <p className="text-xs font-semibold text-red-500 mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{weightInputError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1.5">
+                  Date
+                </label>
+                <input
+                  type="text"
+                  value={newWeightDateInput}
+                  onChange={(e) => setNewWeightDateInput(e.target.value)}
+                  placeholder="e.g. Today, Oct 1, Oct 8"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition outline-hidden ${
+                    darkMode
+                      ? 'bg-gray-800 border-gray-700 text-white focus:border-[#d9f65b]'
+                      : 'bg-white border-gray-200 text-[#182018] focus:border-[#7da800]'
+                  }`}
+                />
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[11px]">
+                  <span className="text-gray-400 text-[10px] font-bold">Quick:</span>
+                  {['Today', 'Oct 1', 'Oct 8', 'Oct 15'].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setNewWeightDateInput(d)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer text-[10px] ${
+                        newWeightDateInput === d
+                          ? 'bg-[#d9f65b] text-[#182018]'
+                          : darkMode
+                          ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogWeightModalOpen(false);
+                    setWeightInputError(null);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs sm:text-sm transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#182018] dark:bg-[#d9f65b] text-[#d9f65b] dark:text-[#182018] font-bold text-xs sm:text-sm transition shadow-md cursor-pointer hover:opacity-95"
+                >
+                  Save Weight
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          SAVED PLANS MODAL (Saved Plans feature preserved, History removed)
+         ========================================================================= */}
+      {isSavedPlansModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 backdrop-blur-md p-4 no-print overflow-y-auto"
+          onClick={() => setIsSavedPlansModalOpen(false)}
+        >
+          <div
+            className={`w-[min(720px,96%)] max-h-[90vh] flex flex-col p-6 sm:p-8 rounded-[28px] shadow-2xl border animate-pop relative ${
+              darkMode ? 'bg-[#182018] text-white border-gray-700' : 'bg-white text-[#182018] border-gray-100'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#d9f65b]/20 text-[#7da800] dark:text-[#d9f65b] flex items-center justify-center text-xl font-bold shadow-xs">
+                  📁
+                </div>
+                <div>
+                  <h2 className="text-xl font-black font-['Cabinet_Grotesk']">
+                    Saved Fitness Plans
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {savedPlans.length} {savedPlans.length === 1 ? 'routine' : 'routines'} saved locally
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSavedPlansModalOpen(false)}
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 py-4 pr-1 space-y-3">
+              {savedPlans.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-base font-bold mb-1">No Saved Plans Yet</p>
+                  <p className="text-xs text-gray-400">
+                    Generate a routine in the planner to save it here.
+                  </p>
+                </div>
+              ) : (
+                savedPlans.map((item) => {
+                  const isCurrent = currentPlan?.id === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 sm:p-5 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                        isCurrent
+                          ? 'border-[#7da800] bg-[#fafcf7] dark:bg-gray-800/80 ring-2 ring-[#7da800]/20'
+                          : darkMode
+                          ? 'border-gray-700/80 bg-gray-800/40 hover:border-gray-600'
+                          : 'border-gray-200 bg-[#fafcf9] hover:border-[#7da800]/50'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-extrabold text-sm sm:text-base">
+                            {item.name}'s Routine
+                          </h3>
+                          {isCurrent && (
+                            <span className="text-[10px] font-bold bg-[#d9f65b] text-[#182018] px-2 py-0.5 rounded-full">
+                              Active
+                            </span>
+                          )}
+                          <span className="text-[11px] text-gray-400 font-medium">
+                            Plan #{item.id}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                          <span>{item.age} yrs</span>
+                          <span>·</span>
+                          <span>{item.weight} kg</span>
+                          <span>·</span>
+                          <span className="font-bold text-[#537700] dark:text-[#d9f65b]">{item.goal}</span>
+                          <span>·</span>
+                          <span>{item.intensity}</span>
+                          {item.diet && (
+                            <>
+                              <span>·</span>
+                              <span>{item.diet}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-400">{item.created_at}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentPlan(item);
+                            setIsSavedPlansModalOpen(false);
+                            setTimeout(() => {
+                              const res = document.getElementById('result');
+                              if (res) res.scrollIntoView({ behavior: 'smooth' });
+                            }, 100);
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs ${
+                            isCurrent
+                              ? 'bg-[#182018] text-white dark:bg-white dark:text-[#182018]'
+                              : 'bg-[#d9f65b] text-[#182018] hover:bg-[#cbe346]'
+                          }`}
+                        >
+                          {isCurrent ? 'Viewing' : 'View Routine →'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSavedPlansModalOpen(false);
+                            handleInitiateDelete(item);
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition cursor-pointer"
+                          title={`Delete ${item.name}'s plan`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

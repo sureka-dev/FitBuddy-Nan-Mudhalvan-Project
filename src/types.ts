@@ -18,6 +18,25 @@ export interface DayPlan {
   exercises: Exercise[];
 }
 
+export interface MealsOfDay {
+  breakfast: string;
+  mid_morning_snack: string;
+  lunch: string;
+  evening_snack: string;
+  dinner: string;
+}
+
+export interface DayNutritionPlan {
+  day: string; // e.g. "Day 1 (Monday)"
+  focus?: string;
+  estimated_calories: number;
+  protein_grams: number;
+  carbs_grams: number;
+  fats_grams: number;
+  hydration_liters: string;
+  meals: MealsOfDay;
+}
+
 export interface SampleMealPlan {
   breakfast?: string;
   lunch?: string;
@@ -29,6 +48,7 @@ export interface FitnessPlanData {
   summary: string;
   days: DayPlan[];
   sample_meal_plan?: SampleMealPlan;
+  nutrition_plan_7days?: DayNutritionPlan[];
   nutrition_tip: string;
   recovery_tip: string;
   hydration_tip?: string;
